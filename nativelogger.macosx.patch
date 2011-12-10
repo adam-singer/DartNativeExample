@@ -1,0 +1,96 @@
+Index: corelib/src/corelib_sources.gypi
+===================================================================
+--- corelib/src/corelib_sources.gypi	(revision 2298)
++++ corelib/src/corelib_sources.gypi	(working copy)
+@@ -35,5 +35,6 @@
+     'strings.dart',
+     'string_buffer.dart',
+     'time_zone.dart',
++    'nativelogger.dart',
+   ],
+ }
+Index: runtime/vm/bootstrap_natives.h
+===================================================================
+--- runtime/vm/bootstrap_natives.h	(revision 2298)
++++ runtime/vm/bootstrap_natives.h	(working copy)
+@@ -99,6 +99,8 @@
+   V(AssertionError_throwNew, 2)                                                \
+   V(TypeError_throwNew, 4)                                                     \
+   V(FallThroughError_throwNew, 1)                                              \
++  V(NativeLogger_printNewLine, 0)                                              \
++  V(NativeLogger_printStr, 1)                                                  \
+   V(Clock_now, 0)                                                              \
+   V(Clock_frequency, 0)                                                        \
+   V(ByteBuffer_allocate, 1)                                                    \
+Index: runtime/lib/nativelogger.dart
+===================================================================
+--- runtime/lib/nativelogger.dart	(revision 0)
++++ runtime/lib/nativelogger.dart	(revision 0)
+@@ -0,0 +1,20 @@
++class NativeLogger {
++	// private name field
++    final String _name;
++    
++    // factory constructor
++    factory NativeLogger(String name) {
++        return new NativeLogger.withName(name);
++    }
++
++	// constuctor with name
++    NativeLogger.withName(String name) : _name = name {}
++
++	// new line methods static and non static
++	void newLine() => NativeLogger.printNewLine();
++    static void printNewLine() native "NativeLogger_printNewLine";
++	
++	// log methods
++    void log(arg) => _log(_name + ": " + arg.toString());
++    static void _log(String a) native "NativeLogger_printStr";
++}
+Index: runtime/lib/lib_impl_sources.gypi
+===================================================================
+--- runtime/lib/lib_impl_sources.gypi	(revision 2298)
++++ runtime/lib/lib_impl_sources.gypi	(working copy)
+@@ -30,5 +30,7 @@
+     'string.cc',
+     'string.dart',
+     'string_buffer.dart',
++    'nativelogger.cc',
++    'nativelogger.dart',
+   ],
+ }
+Index: runtime/lib/nativelogger.cc
+===================================================================
+--- runtime/lib/nativelogger.cc	(revision 0)
++++ runtime/lib/nativelogger.cc	(revision 0)
+@@ -0,0 +1,17 @@
++#include "vm/bootstrap_natives.h"
++#include "vm/object.h"
++#include "vm/os.h"
++namespace dart {
++
++	// Native entry with zero parameters
++	DEFINE_NATIVE_ENTRY(NativeLogger_printNewLine, 0) {
++	   OS::Print("\n");
++	}
++
++	// Native entry with one parameter
++	DEFINE_NATIVE_ENTRY(NativeLogger_printStr, 1) {
++	  const String& a = String::CheckedHandle(arguments->At(0));
++	  OS::Print(a.ToCString());
++	}
++
++}
+Index: tools/build.py
+===================================================================
+--- tools/build.py	(revision 2298)
++++ tools/build.py	(working copy)
+@@ -106,6 +106,8 @@
+         if os.path.exists('dart-%s.gyp' % CurrentDirectoryBaseName()):
+           project_file = 'dart-%s.xcodeproj' % CurrentDirectoryBaseName()
+         args = ['xcodebuild',
++                '-sdk',
++                'macosx10.6',
+                 '-project',
+                 project_file,
+                 '-target',
